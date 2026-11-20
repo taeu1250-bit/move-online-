@@ -1,0 +1,6 @@
+{
+  "name": "moov-online-local",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-06-01",
+  "d1_databases": [{"binding":"DB","database_name":"moov-local","database_id":"00000000-0000-4000-8000-000000000001","migrations_dir":"drizzle"}]
+}

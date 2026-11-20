@@ -1,0 +1,104 @@
+.mode-active,
+.lightning {
+  background: var(--lime, #d9ff63) !important;
+  color: #121723 !important;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+.operation-count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.operation-count strong {
+  font-size: 25px;
+}
+.operation-count span {
+  color: #aeb7c9;
+  font-size: 14px;
+  margin-left: auto;
+}
+.operations-panel details {
+  padding: 12px 0;
+  border-top: 1px solid #303748;
+}
+.operations-panel summary,
+.rules-table dt {
+  font-weight: 700;
+}
+.admin-zone {
+  margin-top: 40px !important;
+  border: 1px solid #aa4c59 !important;
+  background: #281d29 !important;
+}
+.admin-zone > summary {
+  color: #ff9da7;
+  font-size: 18px;
+}
+.admin-zone .admin-count {
+  color: #ffc0c5;
+}
+.match-more {
+  position: relative;
+  text-align: right;
+  margin: -48px 0 20px auto;
+  min-height: 32px;
+  width: fit-content;
+}
+.match-more > summary {
+  font-size: 28px;
+  list-style: none;
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  text-align: center;
+}
+.match-more > div {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  top: 44px;
+  width: min(300px, 80vw);
+  text-align: left;
+  box-shadow: 0 12px 40px #0009;
+}
+.lightning-list {
+  margin-bottom: 28px;
+}
+.rules-table > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) 1.35fr;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #303748;
+}
+.rules-table dd {
+  margin: 0;
+  color: #bfc6d5;
+}
+.rules-table {
+  font-size: 15px;
+}
+.member-search-results {
+  display: grid;
+  gap: 8px;
+}
+.member-search-results button {
+  display: flex;
+  justify-content: space-between;
+}
+.mode-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mode-buttons button {
+  font-size: 16px;
+  font-weight: 700;
+}
+.filter-options button {
+  word-break: keep-all;
+}

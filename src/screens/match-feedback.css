@@ -1,0 +1,74 @@
+.roster-fields {
+  margin: 16px 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.roster-fields legend {
+  padding: 0;
+  font-weight: 700;
+}
+.roster-fields legend span {
+  margin-inline-start: 5px;
+  color: var(--lime);
+}
+.roster-row,
+.roster-fixed {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  margin-block: 9px;
+}
+.roster-fixed {
+  color: var(--text);
+  padding-block: 5px;
+}
+.roster-row > span:first-child,
+.roster-fixed > span:first-child {
+  color: var(--muted);
+  text-align: center;
+}
+.roster-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  gap: 3px;
+  padding-inline: 6px;
+  color: var(--muted);
+}
+.roster-add {
+  min-height: 44px;
+}
+.linked-member {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.match-info-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.match-info-tags .tag {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.host-profile-link {
+  width: 100%;
+  text-align: start;
+  padding: 0;
+}
+.host-profile-link > svg:last-child {
+  margin-inline-start: auto;
+  color: var(--muted);
+}
+.match-guidelines {
+  padding-left: 1.4em;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.match-guidelines li + li {
+  margin-top: 4px;
+}

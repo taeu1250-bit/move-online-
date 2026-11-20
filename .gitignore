@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.sites-runtime/
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+!.env.example
+.client-build/
+.firebase/
+firebase-debug.log*
+ui-debug.log*
+*.sqlite
+*.sqlite3
+backups/

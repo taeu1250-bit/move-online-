@@ -1,0 +1,39 @@
+{
+  "name": "moov-campus-online",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": { "node": ">=26.13.0 <27" },
+  "scripts": {
+    "dev:demo": "npm run build && node scripts/preview-v2-qa.mjs",
+    "verify": "npm run build && npm test",
+    "dev": "npm run build && wrangler dev --local --ip 127.0.0.1",
+    "dev:emulator": "npm run build:emulator && node scripts/local-runtime.mjs",
+    "check": "tsc --noEmit",
+    "build": "npm run check && vite build --outDir .client-build && node scripts/build-sw.mjs && node scripts/build-worker.mjs",
+    "preview": "wrangler dev --local --ip 127.0.0.1",
+    "test": "node --test tests/*.test.ts tests/*.test.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:local": "wrangler d1 migrations apply moov-local --local",
+    "build:emulator": "vite build --mode emulator --outDir .sites-runtime/emulator-client && node scripts/build-sw.mjs --emulator && node scripts/build-worker.mjs --emulator"
+  },
+  "dependencies": {
+    "@block65/webcrypto-web-push": "^2.0.0",
+    "drizzle-orm": "^0.45.4",
+    "firebase": "^12.19.0",
+    "jose": "^6.2.17",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.2",
+    "miniflare": "5.20261110.1-beta",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.0",
+    "wrangler": "^4.160.1"
+  }
+}

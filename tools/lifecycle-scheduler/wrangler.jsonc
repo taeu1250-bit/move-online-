@@ -1,0 +1,7 @@
+{
+  "name": "moov-lifecycle-scheduler",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-06-01",
+  "workers_dev": false,
+  "triggers": { "crons": ["* * * * *"] }
+}
