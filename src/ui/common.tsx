@@ -71,6 +71,10 @@ export function Tags({ m }: { m: Match }) {
 }
 export function SportMark({ sport }: { sport: Sport }) {
   const symbols: Record<Sport, ReactNode> = {
+    탁구: <><path d="M8 15c-4-4-2-11 4-11s8 7 3 11l-4 2-4 5-3-3 5-4" /><circle cx="20" cy="18" r="2" /></>,
+    테니스: <><ellipse cx="14" cy="9" rx="6" ry="7" transform="rotate(35 14 9)" /><path d="m9 14-6 8M10 5l8 8m-10-3 9-4m-4-3-3 12" /></>,
+    수영: <><circle cx="17" cy="5" r="2" /><path d="m4 10 5-5 5 4-4 5M2 17q3-3 6 0t6 0 6 0M2 21q3-3 6 0t6 0 6 0" /></>,
+    배드민턴: <><path d="m6 16 6-14 10 10-14 6ZM12 2l-1 11 11-1M17 7l-6 6" /><path d="M6 16c-6 0-5 7-1 6l3-4" /></>,
     풋살: (
       <>
         <circle cx="12" cy="12" r="9" />
@@ -117,9 +121,9 @@ export function SportMark({ sport }: { sport: Sport }) {
     </svg>
   )
 }
-export function MatchCard({ m, extra }: { m: Match; extra?: string }) {
+export function MatchCard({ m, extra, origin: requestedOrigin }: { m: Match; extra?: string; origin?: string }) {
   const { data } = useMoov()
-  const origin = extra
+  const origin = requestedOrigin ? '?from=' + encodeURIComponent(requestedOrigin) : extra
     ? extra === '내 모집글'
       ? '?from=hosted'
       : '?from=activity'

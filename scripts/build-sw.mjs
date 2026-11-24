@@ -16,6 +16,8 @@ async function list(dir) {
 const files = await list(root)
 const hash = createHash('sha256')
 hash.update(await readFile(new URL(import.meta.url)))
+// Header-only security fixes must also invalidate cached HTML app shells.
+hash.update(await readFile(new URL('../server/security.mjs', import.meta.url)))
 for (const file of files) hash.update(file).update(await readFile(file))
 const version = hash.digest('hex').slice(0, 14)
 // Sites redirects index.html to the directory URL. Cache the final URL so that
@@ -32,6 +34,9 @@ self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys
     .filter(key => key.startsWith(prefix) && key !== cacheName)
     .map(key => caches.delete(key)))).then(() => self.clients.claim()))
+})
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
 })
 self.addEventListener('push',event=>{
   if(!event.data)return
@@ -52,6 +57,22 @@ self.addEventListener('fetch', event => {
   event.respondWith(caches.open(cacheName).then(async cache => {
     // These URLs identify bundled static files; module and precache requests can carry different Origin headers.
     const key = isNavigation ? './' : event.request.url
+    if (isNavigation) {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 6000)
+      try {
+        const response = await fetch(event.request, {cache:'no-store', signal:controller.signal})
+        if (response.ok && response.headers.get('Content-Type')?.includes('text/html')) {
+          await cache.put(key, response.clone())
+          return response
+        }
+        return (await cache.match(key, {ignoreVary:true})) || response
+      } catch (error) {
+        const saved = await cache.match(key, {ignoreVary:true})
+        if (saved) return saved
+        throw error
+      } finally { clearTimeout(timer) }
+    }
     return (await cache.match(key, { ignoreVary: true })) || fetch(event.request)
   }))
 })`

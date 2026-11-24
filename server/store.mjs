@@ -33,7 +33,7 @@ import {
 } from './match-feedback.mjs'
 import { pushCommand } from './reminders.mjs'
 import { requireValue } from './identity.mjs'
-import { sports, venues, canRepresentSport } from '../src/domain/model.ts'
+import { sports, validVenue, canRepresentSport } from '../src/domain/model.ts'
 
 const now = () => new Date().toISOString()
 const random = () => crypto.randomUUID()
@@ -86,10 +86,14 @@ export async function saveProfile(db, actor, input) {
     )
     .run()
 }
-export async function snapshot(db, actor, env) {
-  await runLifecycle(db)
+export async function snapshot(db, actor, env, selectedIds = null, lifecycle = true) {
+  if (lifecycle) await runLifecycle(db, Date.now(), selectedIds)
   await settleNoShows(db)
   const query = (sql, ...args) => db.prepare(sql).bind(...args)
+  const ids = selectedIds ?? (await query(
+    "SELECT id FROM matches WHERE start >= strftime('%Y-%m-%dT%H:%M:%fZ','now','+9 hours','start of day','-9 hours') OR (endAt > strftime('%Y-%m-%dT%H:%M:%fZ','now') AND cancelledAt IS NULL)",
+  ).all()).results.map(m => m.id)
+  const selection = JSON.stringify(ids)
   const [own, games, applications, inbox] = await db.batch([
     query(
       'SELECT id,name,year,dept,skillLevel,levels FROM profiles WHERE id=?',
@@ -101,22 +105,21 @@ export async function snapshot(db, actor, env) {
       CASE WHEN m.kind='friendly' THEN (SELECT count(*) FROM entries e WHERE e.matchId=m.id AND status='approved') ELSE ${approvedSeats} END AS approvals,
       (SELECT count(*) FROM entries e WHERE e.matchId=m.id AND status='pending') AS pendingCount,
       (SELECT team FROM entries e WHERE e.matchId=m.id AND status='approved' AND team IS NOT NULL LIMIT 1) AS opponent
-      FROM matches m JOIN profiles p ON p.id=m.hostId WHERE m.start >= strftime('%Y-%m-%dT00:00:00Z','now','-30 days') OR m.hostId=?
-      OR EXISTS(SELECT 1 FROM entries e WHERE e.matchId=m.id AND (e.userId=? OR (e.status='approved' AND ?1 IN (SELECT value FROM json_each(e.memberIds))))) OR ?1 IN (SELECT value FROM json_each(m.homeMemberIds)) ORDER BY m.start`,
+      FROM matches m JOIN profiles p ON p.id=m.hostId WHERE m.id IN (SELECT value FROM json_each(?2)) ORDER BY m.start`,
       actor,
-      actor,
-      actor,
+      selection,
     ),
     query(
       `SELECT e.id,e.matchId,e.userId,e.team,e.note,e.status,e.at,e.roster,e.proposedRoster,e.proposedNote,e.rosterRevision,e.teamId,e.memberIds,e.proposedMemberIds,p.name,p.levels
       FROM entries e JOIN matches m ON m.id=e.matchId JOIN profiles p ON p.id=e.userId
-      WHERE e.userId=? OR m.hostId=? ORDER BY e.at DESC,e.id`,
+      WHERE (e.userId=?1 OR m.hostId=?1) AND m.id IN (SELECT value FROM json_each(?2)) ORDER BY e.at DESC,e.id`,
       actor,
-      actor,
+      selection,
     ),
     query(
-      'SELECT id,recipient AS "to",matchId,text,at,seen FROM notices WHERE recipient=? ORDER BY at DESC,rowid DESC',
+      'SELECT id,recipient AS "to",matchId,text,at,seen FROM notices WHERE recipient=? AND ?=0 AND dismissedAt IS NULL ORDER BY at DESC,rowid DESC',
       actor,
+      selectedIds ? 1 : 0,
     ),
   ])
   const self = own.results[0]
@@ -184,9 +187,21 @@ export async function snapshot(db, actor, env) {
     team: team?.name,
     teamSport: team?.sport,
   })
+  if (selectedIds) return enrichOperations(db, actor, {
+    version: 1, currentId: actor, users: [...users.values()], matches, entries, notices: [],
+    conduct: await conductState(db, actor, env, [...users.keys()], selectedIds),
+  })
+  const activityCounts = await query(
+    `SELECT (SELECT count(*) FROM matches WHERE hostId=?1) AS hosted,
+      (SELECT count(*) FROM entries WHERE userId=?1 AND status='pending') AS pending,
+      (SELECT count(*) FROM matches m WHERE m.cancelledAt IS NULL AND m.start>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND
+        (EXISTS(SELECT 1 FROM entries e WHERE e.matchId=m.id AND e.userId=?1 AND e.status='approved')
+        OR EXISTS(SELECT 1 FROM match_operations o, json_each(o.state,'$.people') p
+          WHERE o.matchId=m.id AND json_extract(p.value,'$.userId')=?1 AND json_extract(p.value,'$.approved')=1
+            AND json_extract(p.value,'$.consent')='accepted' AND m.hostId<>?1))) AS joined`, actor).first()
   const [hub, conduct, consent] = await Promise.all([
     teamState(db, actor, env),
-    conductState(db, actor, env, [...users.keys()]),
+    conductState(db, actor, env, [...users.keys()], ids),
     query(
       'SELECT at FROM policy_consents WHERE userId=? AND version=?',
       actor,
@@ -194,6 +209,7 @@ export async function snapshot(db, actor, env) {
     ).first(),
   ])
   return enrichOperations(db, actor, {
+    activityCounts,
     mannerHistory: await mannerHistory(db, actor),
     reportCases: await reportState(db, actor, env),
     teamHub: hub,
@@ -267,6 +283,12 @@ export async function execute(db, actor, c, env) {
     ).run()
     return
   }
+  if (c.type === 'clearNotices') {
+    // Remove inbox content, retaining only delivery IDs to prevent scheduled
+    // retries from resurrecting notifications. The actor always comes from Auth.
+    await stmt("UPDATE notices SET text='',seen=1,dismissedAt=? WHERE recipient=? AND dismissedAt IS NULL", at, actor).run()
+    return
+  }
   // Every notice and related write is tied to the mutation that actually won the conditional write.
   // D1 executes each batch in a single transaction. Roster totals are derived from approved rows.
   const notices = (message, condition, args, recipient = 'e.userId') =>
@@ -285,7 +307,7 @@ export async function execute(db, actor, c, env) {
         /^[a-f0-9-]{20,40}$/.test(c.type === 'create' ? c.id : c.matchId) &&
         textValue(f.title, 1, 40) &&
         sports.includes(f.sport) &&
-        venues.includes(f.venue) &&
+        validVenue(f.venue) &&
         ['pickup', 'friendly'].includes(f.kind) &&
         (f.level === '' ||
           [...matchLevels, '누구나 환영', '숙련자 위주'].includes(f.level)) &&

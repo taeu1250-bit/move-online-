@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useLivePoll } from '../ui/useLivePoll'
+import { mergeMatchData } from '../data/contracts'
+import { SportPicker } from '../ui/SportPicker'
 import { operationPolicy } from '../domain/operations'
 import {
   CalendarDays,
@@ -13,15 +16,18 @@ import {
   fmtDate,
   kindLabel,
   shiftDay,
-  sports,
   today,
 } from '../domain/model'
-import type { Kind, Sport } from '../domain/model'
+import type { Data, Kind, Sport } from '../domain/model'
 import { Empty, MatchCard } from '../ui/common'
-import { useMoov } from '../ui/context'
+import { Context, useMoov } from '../ui/context'
 
 export function Find({ initialDate }: { initialDate: string | null }) {
-  const { data } = useMoov()
+  const context = useMoov()
+  const { services } = context
+  const [dayData, setDayData] = useState<Data | null>(null)
+  const [dayError, setDayError] = useState('')
+  const data = dayData ? mergeMatchData(context.data, dayData) : context.data
   const [date, setDate] = useState(() => {
     if (
       initialDate &&
@@ -35,6 +41,20 @@ export function Find({ initialDate }: { initialDate: string | null }) {
     return next ? dateKey(next.start) : today()
   })
   const [query, setQuery] = useState('')
+  useEffect(() => {
+    setDayData(null); setDayError('')
+  }, [date, services])
+  const refreshDay = useCallback(async (current: () => boolean) => {
+    if (!services.findDay) return
+    try {
+      const result = await services.findDay(date)
+      if (current()) { setDayData(result); setDayError('') }
+    } catch (e) {
+      if (current()) setDayError(e instanceof Error ? e.message : '연결을 다시 시도하고 있어요.')
+      throw e
+    }
+  }, [date, services])
+  useLivePoll(refreshDay, 15_000)
   const [sport, setSport] = useState<Sport | '전체'>('전체')
   const [kind, setKind] = useState<Kind | 'all'>('all')
   const [sort, setSort] = useState<'time' | 'new'>('time')
@@ -69,9 +89,10 @@ export function Find({ initialDate }: { initialDate: string | null }) {
         : b.createdAt.localeCompare(a.createdAt),
     )
   return (
-    <div className="find-layout">
+    <Context.Provider value={{...context, data}}><div className="find-layout">
       <aside className="find-controls">
         <h1>경기 찾기</h1>
+        {dayError && <p role="alert">{dayError}</p>}
         <div className="search-box" role="search">
           <Search size={18} />
           <input
@@ -130,21 +151,7 @@ export function Find({ initialDate }: { initialDate: string | null }) {
         </section>
         <section className="filters">
           <h2 id="sport-filter-title">운동 종목</h2>
-          <div
-            className="chips filter-options sport-options"
-            role="group"
-            aria-labelledby="sport-filter-title"
-          >
-            {(['전체', ...sports] as const).map((s) => (
-              <button
-                aria-pressed={s === sport}
-                key={s}
-                onClick={() => setSport(s)}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          <SportPicker home value={sport} onChange={setSport} />
         </section>
         <section className="filters">
           <h2 id="kind-filter-title">모집 유형</h2>
@@ -211,6 +218,6 @@ export function Find({ initialDate }: { initialDate: string | null }) {
           </Empty>
         )}
       </section>
-    </div>
+    </div></Context.Provider>
   )
 }

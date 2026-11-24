@@ -6,6 +6,8 @@ import {
 } from './identity.mjs'
 import { execute, saveProfile, snapshot } from './store.mjs'
 import { inviteLink } from './invite-links.mjs'
+import { readChat, chatCommand } from './chat.mjs'
+import { activityPage, matchDetail, matchesByDay } from './activity.mjs'
 function reply(body, status = 200) {
   return Response.json(body, {
     status,
@@ -23,8 +25,12 @@ export async function handleApi(request, env) {
       return reply({ firebase: firebaseConfig(env) })
     const paths = {
       '/api/state': 'GET',
+      '/api/activity': 'GET',
+      '/api/match': 'GET',
+      '/api/matches': 'GET',
       '/api/members': 'GET',
       '/api/team-invite': request.method === 'GET' ? 'GET' : 'POST',
+      '/api/chat': request.method === 'GET' ? 'GET' : 'POST',
       '/api/profile': 'POST',
       '/api/command': 'POST',
     }
@@ -50,6 +56,14 @@ export async function handleApi(request, env) {
     }
     const actor = await identify(request, env)
     requireValue(env.DB, 503, '개발 데이터베이스를 연결해 주세요.')
+    if (url.pathname === '/api/activity')
+      return reply(await activityPage(env.DB, actor, env, Object.fromEntries(url.searchParams)))
+    if (url.pathname === '/api/match')
+      return reply(await matchDetail(env.DB, actor, env, url.searchParams.get('id')))
+    if (url.pathname === '/api/matches')
+      return reply(await matchesByDay(env.DB, actor, env, url.searchParams.get('day')))
+    if (url.pathname === '/api/chat' && request.method === 'GET')
+      return reply(await readChat(env.DB, actor, url.searchParams.get('matchId'), Number(url.searchParams.get('after') || 0), env))
     if (url.pathname === '/api/team-invite' && request.method === 'GET')
       return reply(
         await inviteLink(
@@ -90,6 +104,8 @@ export async function handleApi(request, env) {
     )
     if (url.pathname === '/api/team-invite')
       return reply(await inviteLink(env.DB, actor, input))
+    if (url.pathname === '/api/chat')
+      return reply(await chatCommand(env.DB, actor, input, env))
     if (url.pathname === '/api/profile') await saveProfile(env.DB, actor, input)
     else await execute(env.DB, actor, input, env)
     return reply({ ok: true })

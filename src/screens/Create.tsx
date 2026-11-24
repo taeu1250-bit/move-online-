@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { operationPolicy } from '../domain/operations'
+import { fromKoreanInput, toKoreanInput, shiftEndInput } from '../domain/schedule'
+import { SportPicker } from '../ui/SportPicker'
 import { Check, Plus, Minus, Trophy, UserRound } from 'lucide-react'
 import {
   canRepresentSport,
@@ -8,6 +11,7 @@ import {
   sports,
   today,
   venues,
+  validVenue,
   kindLabel,
 } from '../domain/model'
 import type { Kind, Match, Sport } from '../domain/model'
@@ -20,7 +24,7 @@ import {
 import type { MatchInfo } from '../domain/feedback'
 import { MatchInfoFields, RosterFields, useRoster } from './MatchFields'
 import { uid } from '../domain/matching'
-import { BackTitle, SportMark } from '../ui/common'
+import { BackTitle } from '../ui/common'
 import { useMoov, go } from '../ui/context'
 
 function Stepper({
@@ -77,6 +81,7 @@ export function Create({ match }: { match?: Match }) {
   )
   const [title, setTitle] = useState(match?.title ?? '')
   const [venue, setVenue] = useState(match?.venue ?? '')
+  const [customVenue, setCustomVenue] = useState(!!match?.venue && !venues.some(v => v === match.venue))
   const [date, setDate] = useState(
     match ? dateKey(match.start) : shiftDay(today(), 1),
   )
@@ -103,11 +108,15 @@ export function Create({ match }: { match?: Match }) {
   const approvedSeats =
     match?.kind === 'pickup' ? seats(data, match) - match.existing : 0
   const friendly = kind === 'friendly'
-  const start =
-    date && time ? new Date(date + 'T' + time + ':00+09:00').toISOString() : ''
-  const endAt = end ? new Date(end + ':00+09:00').toISOString() : null
+  const start = date && time ? fromKoreanInput(date + 'T' + time) : ''
+  const endAt = end ? fromKoreanInput(end) : null
+  function changeStart(nextDate: string, nextTime: string) {
+    setEnd(previous => shiftEndInput(date + 'T' + time, nextDate + 'T' + nextTime, previous))
+    setDate(nextDate); setTime(nextTime)
+  }
   const rosterIssue = rosterError(representative, roster.names, roster.ids)
   const valid =
+    validVenue(venue) &&
     !rosterIssue &&
     !!endAt &&
     minimum <= capacity &&
@@ -127,7 +136,12 @@ export function Create({ match }: { match?: Match }) {
         formats[next] ? Number(formats[next]!.at(-1)!.split('vs')[0]) * 2 : 6,
       )
     }
-    if (next !== sport) setInfo(info.gender ? { gender: info.gender } : {})
+    if (next !== sport) setInfo(({ gender, venueAddress, venueMapUrl, venueMeeting }) => ({
+      ...(gender ? { gender } : {}),
+      ...(venueAddress ? { venueAddress } : {}),
+      ...(venueMapUrl ? { venueMapUrl } : {}),
+      ...(venueMeeting ? { venueMeeting } : {}),
+    }))
   }
   if (
     match &&
@@ -150,7 +164,7 @@ export function Create({ match }: { match?: Match }) {
       kind,
       sport,
       title,
-      venue,
+      venue: venue.trim(),
       start,
       endAt,
       info,
@@ -225,23 +239,8 @@ export function Create({ match }: { match?: Match }) {
             </section>
             <section className="panel">
               <h2>운동 종목</h2>
-              <div className="sport-grid">
-                {sports
-                  .filter(
-                    (s) => !friendly || canRepresentSport(user.teamSport, s),
-                  )
-                  .map((s) => (
-                    <button
-                      type="button"
-                      aria-pressed={sport === s}
-                      key={s}
-                      onClick={() => selectSport(s)}
-                    >
-                      <SportMark sport={s} />
-                      {s}
-                    </button>
-                  ))}
-              </div>
+              <SportPicker value={sport} onChange={s => { if (s !== '전체') selectSport(s) }}
+                allowed={friendly ? sports.filter(s => canRepresentSport(user.teamSport, s)) : undefined} />
             </section>
           </>
         )}
@@ -267,7 +266,8 @@ export function Create({ match }: { match?: Match }) {
                 type="date"
                 min={today()}
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onInput={(e) => changeStart(e.currentTarget.value, time)}
+                onChange={(e) => changeStart(e.target.value, time)}
               />
             </label>
             <label>
@@ -276,7 +276,8 @@ export function Create({ match }: { match?: Match }) {
                 required
                 type="time"
                 value={time}
-                onChange={(e) => setTime(e.target.value)}
+                onInput={(e) => changeStart(date, e.currentTarget.value)}
+                onChange={(e) => changeStart(date, e.target.value)}
               />
             </label>
           </div>
@@ -287,12 +288,14 @@ export function Create({ match }: { match?: Match }) {
               required
               value={end}
               min={date && time ? date + 'T' + time : undefined}
+              max={start ? toKoreanInput(Date.parse(start) + operationPolicy.maxPlayHours * 3600000) : undefined}
+              onInput={(e) => setEnd(e.currentTarget.value)}
               onChange={(e) => setEnd(e.target.value)}
             />
           </label>
           {!validEndAt(start, endAt) && (
             <p className="hint" role="status">
-              종료 일시는 시작 시간 뒤로 설정해 주세요.
+              종료 일시는 시작 후 {operationPolicy.maxPlayHours}시간 이내로 설정해 주세요.
             </p>
           )}
         </section>
@@ -310,13 +313,41 @@ export function Create({ match }: { match?: Match }) {
                   name="venue"
                   required
                   value={place}
-                  checked={venue === place}
-                  onChange={() => setVenue(place)}
+                  checked={!customVenue && venue === place}
+                  onChange={() => {
+                    setCustomVenue(false); setVenue(place)
+                    setInfo(({venueAddress: _a, venueMapUrl: _u, venueMeeting: _m, ...rest}) => rest)
+                  }}
                 />
                 <span>{place}</span>
               </label>
             ))}
+            <label className="venue-option custom-venue">
+              <input type="radio" name="venue" required checked={customVenue}
+                onChange={() => { setCustomVenue(true); setVenue('') }} />
+              <span>다른 장소 직접 입력</span>
+            </label>
           </div>
+          {customVenue && <div className="custom-venue-fields">
+            <label>장소 이름<input required maxLength={80} value={venue}
+              placeholder="예: 원주 테니스장" onChange={e => setVenue(e.target.value)} /></label>
+            {([
+              ['venueAddress', '주소 (선택)', 200],
+              ['venueMapUrl', '지도 링크 (선택)', 1000],
+              ['venueMeeting', '만나는 위치·안내 (선택)', 300],
+            ] as const).map(([key, label, max]) => <label key={key}>{label}
+              <input type={key === 'venueMapUrl' ? 'url' : 'text'} maxLength={max}
+                placeholder={key === 'venueMapUrl' ? 'https://로 시작하는 지도 링크' : undefined}
+                value={info[key] || ''} onChange={e => setInfo(previous => {
+                  const next = { ...previous }
+                  if (e.target.value.trim()) next[key] = e.target.value
+                  else delete next[key]
+                  return next
+                })} />
+            </label>)}
+            {info.venueMapUrl && !validMatchInfo(sport, info) &&
+              <p className="hint">지도 링크는 https://로 시작하는 주소를 입력해 주세요.</p>}
+          </div>}
         </section>
         <section className="panel">
           <h2>인원 및 참가비</h2>

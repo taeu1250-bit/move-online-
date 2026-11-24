@@ -2,6 +2,7 @@ import { runLifecycle } from './operations.mjs'
 import { runReminders } from './reminders.mjs'
 import { handleApi } from './api.mjs'
 import assets from 'moov:client-assets'
+import { frameAncestors } from './security.mjs'
 export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(runLifecycle(env.DB))
@@ -48,6 +49,7 @@ export default {
       return new Response(null, { status: 404 })
     const [type, encoded] = asset
     const headers = {
+      ...(type.startsWith('text/html') ? { 'Content-Security-Policy': frameAncestors } : {}),
       'Content-Type': type,
       'X-Content-Type-Options': 'nosniff',
       'Cache-Control': pathname.startsWith('/assets/')

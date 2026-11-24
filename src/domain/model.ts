@@ -2,7 +2,9 @@ import type { OperationView } from './operations'
 import type { MatchInfo } from './feedback'
 import type { TeamHub } from './teams'
 import type { ConductState } from './conduct'
-export const sports = ['풋살', '축구', '농구', '러닝', '헬스'] as const
+export const sports = ['풋살', '축구', '농구', '러닝', '헬스', '탁구', '테니스', '수영', '배드민턴'] as const
+export const validVenue = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0 && value.length <= 80 && !/[\u0000-\u001f]/.test(value)
 export const venues = ['대운동장', '풋살장', '스포츠센터', '농구장'] as const
 export type Sport = (typeof sports)[number]
 export type Kind = 'pickup' | 'friendly'
@@ -92,6 +94,7 @@ export interface Notice {
   read: boolean
 }
 export interface Data {
+  activityCounts?: { hosted: number; pending: number; joined: number }
   mannerHistory?: {
     id: string
     matchId: string

@@ -9,9 +9,10 @@ import {
   matchLevels,
 } from '../src/domain/feedback.ts'
 import { checkLevel } from './match-feedback.mjs'
-import { sports, venues, canRepresentSport } from '../src/domain/model.ts'
+import { sports, validVenue, canRepresentSport } from '../src/domain/model.ts'
 import {
   operationPolicy as P,
+  automaticEndAt,
   cancelReasons,
 } from '../src/domain/operations.ts'
 const H = 3600000,
@@ -99,8 +100,8 @@ export function advance(s, at) {
       )
     }
   }
-  if (s.startedAt && at >= s.end) {
-    s.endedAt = at
+  if (s.startedAt && at >= automaticEndAt(s.startedAt, s.end)) {
+    s.endedAt = automaticEndAt(s.startedAt, s.end)
     notify(s, '경기가 종료됐어요. 출석 확인 후 함께한 회원을 칭찬해 보세요.')
   }
   return s
@@ -143,7 +144,7 @@ function validateFields(f, at) {
   ok(
     f &&
       sports.includes(f.sport) &&
-      venues.includes(f.venue) &&
+      validVenue(f.venue) &&
       ['pickup', 'friendly'].includes(f.kind),
     '종목과 장소를 확인해 주세요.',
     400,
@@ -167,7 +168,7 @@ function validateFields(f, at) {
   )
   ok(
     Date.parse(f.start) > at && f.endAt && validEndAt(f.start, f.endAt),
-    '미래의 시작 시각과 종료 시각을 입력해 주세요.',
+    '미래의 시작 시각과 시작 후 ' + P.maxPlayHours + '시간 이내의 종료 시각을 입력해 주세요.',
     400,
   )
   ok(
@@ -499,10 +500,11 @@ export async function createOperation(db, actor, c, env, at = Date.now()) {
   ])
   return true
 }
-export async function runLifecycle(db, at = Date.now()) {
+export async function runLifecycle(db, at = Date.now(), selectedIds = null) {
   const rows = await q(
     db,
-    `SELECT * FROM match_operations WHERE json_extract(state,'$.cancelledAt') IS NULL AND json_extract(state,'$.endedAt') IS NULL`,
+    `SELECT * FROM match_operations WHERE json_extract(state,'$.cancelledAt') IS NULL AND json_extract(state,'$.endedAt') IS NULL ${selectedIds ? 'AND matchId IN (SELECT value FROM json_each(?))' : ''}`,
+    ...(selectedIds ? [JSON.stringify(selectedIds)] : []),
   ).all()
   let changed = 0
   for (const row of rows.results) {
@@ -962,7 +964,7 @@ export async function operationCommand(db, actor, c, env) {
   return true
 }
 export async function enrichOperations(db, actor, data) {
-  const rows = await q(db, 'SELECT matchId,state FROM match_operations').all()
+  const rows = await q(db, 'SELECT matchId,state FROM match_operations WHERE matchId IN (SELECT value FROM json_each(?))', JSON.stringify(data.matches.map(m => m.id))).all()
   for (const row of rows.results) {
     const s = JSON.parse(row.state),
       m = data.matches.find((x) => x.id === row.matchId)

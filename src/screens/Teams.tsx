@@ -25,23 +25,6 @@ export function TeamMode() {
           {active.name} · {active.sport}
         </p>
       )}
-      <div className="mode-buttons">
-        <button
-          className={!active ? 'primary' : 'secondary'}
-          disabled={busy}
-          aria-pressed={!active}
-          onClick={() => void act({ type: 'team.switch', teamId: null })}
-        >
-          개인회원
-        </button>
-        <button
-          className={active ? 'primary' : 'secondary'}
-          aria-pressed={!!active}
-          onClick={() => go('teams')}
-        >
-          팀 대표자
-        </button>
-      </div>
       <div className="action-pair">
         {active ? (
           <button

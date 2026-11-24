@@ -93,18 +93,25 @@ function SignedIn({ auth, user }: { auth: Auth; user: User }) {
   )
   useEffect(() => {
     let active = true
+    let lastRefresh = 0
     const refresh = () => {
-      if (active && !document.hidden) void services.refresh()
+      if (active && !document.hidden && Date.now() - lastRefresh >= 30_000) {
+        lastRefresh = Date.now()
+        void services.refresh()
+      }
     }
     refresh()
-    const timer = setInterval(refresh, 20000)
+    // No whole-app polling. Refresh when returning to the app or navigating;
+    // chat has its own bounded, visible-only message polling.
+    const navigate = () => { if (!location.hash.startsWith('#/chat/')) refresh() }
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('hashchange', navigate)
     return () => {
       active = false
-      clearInterval(timer)
       window.removeEventListener('focus', refresh)
       document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('hashchange', navigate)
     }
   }, [services])
   const self = state.data?.users.find(

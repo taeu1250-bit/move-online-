@@ -428,6 +428,7 @@ function ReviewReport({ report }: { report: ConductState['reports'][number] }) {
   return (
     <article className="panel compact stack">
       <strong>
+        {report.targetType === 'chat' && '채팅방 신고 · '}
         {report.label} · {report.reason}
       </strong>
       <small>
@@ -439,6 +440,10 @@ function ReviewReport({ report }: { report: ConductState['reports'][number] }) {
         }
       </small>
       {report.result && <p>{report.result}</p>}
+      {report.targetType === 'chat' && <>
+        <p className="hint">채팅 종료 후 원문은 삭제됩니다. 신고 사유만으로 사실을 확정하거나 제재하지 마세요. 처리 기록에 대화 원문을 복사하지 마세요.</p>
+        {report.state === 'pending' && <a className="secondary" href={'#/chat/' + report.targetId}>채팅방 확인</a>}
+      </>}
       {report.state === 'pending' && (
         <>
           <label>

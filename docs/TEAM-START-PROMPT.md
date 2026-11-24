@@ -34,7 +34,7 @@ moov. 공동 개발을 시작해 줘.
 GitHub 연결이나 저장소 권한이 부족하면 필요한 연결 절차를 알려 줘. 연결이 완료됐다고 가정하지 마.
 
 1. 연결된 저장소와 Git 상태를 확인해 줘. 저장소가 없다면 클라우드 작업 공간에 복제해 줘.
-2. README.md, docs/TEAM-DEVELOPMENT.md, V2-IMPLEMENTATION.md를 읽고 기존 구조와 구현 범위를 파악해 줘.
+2. README.md, docs/TEAM-DEVELOPMENT.md, docs/V9-UPDATE.md, V2-IMPLEMENTATION.md를 읽고 기존 구조와 구현 범위를 파악해 줘.
 3. .nvmrc와 package.json에 지정된 Node.js를 클라우드에 준비하고 npm ci, npm run verify를 실행해 줘.
 4. npm run dev:demo로 앱을 실행해 줘. 가능한 경우 인증된 비공개 미리보기로 화면을 확인해 줘.
    127.0.0.1은 클라우드 내부 주소이므로 내 컴퓨터에서 바로 열 수 있다고 안내하지 마.

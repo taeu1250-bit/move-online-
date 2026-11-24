@@ -111,7 +111,8 @@ export interface ConductState {
   restrictionUntil: number | null
   reports: {
     id: string
-    targetType: 'user' | 'match'
+    targetType: 'user' | 'match' | 'chat'
+    targetId: string
     label: string
     reason: string
     at: number
