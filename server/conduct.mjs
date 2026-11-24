@@ -436,7 +436,7 @@ export async function executeConduct(db, actor, c, env = {}) {
   }
 }
 
-export async function conductState(db, actor, env = {}, relatedUserIds = []) {
+export async function conductState(db, actor, env = {}, relatedUserIds = [], matchIds = null) {
   const at = Date.now(),
     isAdmin = admin(env, actor)
   const [roster, cases, restriction, reports] = await db.batch([
@@ -451,8 +451,9 @@ export async function conductState(db, actor, env = {}, relatedUserIds = []) {
         EXISTS(SELECT 1 FROM attendance own WHERE own.matchId=p.matchId AND own.userId=? AND own.status='present') AS actorPresent
       FROM people p LEFT JOIN attendance a ON a.matchId=p.matchId AND a.personKey=p.personKey
       LEFT JOIN noShows n ON n.matchId=p.matchId AND n.personKey=p.personKey
-      WHERE p.hostId=? OR p.uid=? OR (a.status='present' AND p.uid IS NOT NULL AND ? IS NOT NULL AND
-        EXISTS(SELECT 1 FROM attendance own WHERE own.matchId=p.matchId AND own.userId=? AND own.status='present'))
+      WHERE (p.hostId=? OR p.uid=? OR (a.status='present' AND p.uid IS NOT NULL AND ? IS NOT NULL AND
+        EXISTS(SELECT 1 FROM attendance own WHERE own.matchId=p.matchId AND own.userId=? AND own.status='present')))
+        AND (? IS NULL OR p.matchId IN (SELECT value FROM json_each(?)))
       ORDER BY p.endAt DESC,p.matchId,(p.uid IS NOT p.hostId),p.personKey`,
       utc(at),
       actor,
@@ -463,6 +464,8 @@ export async function conductState(db, actor, env = {}, relatedUserIds = []) {
       actor,
       utc(at - policy.praiseHours * hour),
       actor,
+      matchIds === null ? null : JSON.stringify(matchIds),
+      JSON.stringify(matchIds || []),
     ),
     bound(
       db,
@@ -476,8 +479,8 @@ export async function conductState(db, actor, env = {}, relatedUserIds = []) {
     bound(db, `SELECT ${restrictionUntilSQL('?', '?')} AS untilMs`, actor, at),
     bound(
       db,
-      `SELECT g.id,g.targetType,CASE WHEN g.targetType='match' THEN m.title ELSE p.name END AS label,g.reason,g.at,g.state,g.result
-      FROM generalReports g LEFT JOIN matches m ON g.targetType='match' AND m.id=g.targetId
+      `SELECT g.id,g.targetType,g.targetId,CASE WHEN g.targetType IN ('match','chat') THEN m.title ELSE p.name END AS label,g.reason,g.at,g.state,g.result
+      FROM generalReports g LEFT JOIN matches m ON g.targetType IN ('match','chat') AND m.id=g.targetId
       LEFT JOIN profiles p ON g.targetType='user' AND p.id=g.targetId WHERE ?=1 ORDER BY (g.state='pending') DESC,g.at DESC`,
       Number(isAdmin),
     ),

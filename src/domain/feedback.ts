@@ -12,6 +12,9 @@ export const matchLevels = [
 ] as const
 export const genders = ['남성', '여성', '남녀모두'] as const
 export interface MatchInfo {
+  venueAddress?: string
+  venueMapUrl?: string
+  venueMeeting?: string
   gender?: (typeof genders)[number]
   format?: string
   shoes?: string
@@ -33,6 +36,12 @@ export function validMatchInfo(sport: Sport, value: unknown): boolean {
   if (typeof value !== 'object' || Array.isArray(value)) return false
   return Object.entries(value).every(([key, v]) => {
     switch (key) {
+      case 'venueAddress':
+        return optionalText(v, 200)
+      case 'venueMeeting':
+        return optionalText(v, 300)
+      case 'venueMapUrl':
+        return validMapUrl(v)
       case 'gender':
         return genders.some((item) => item === v)
       case 'format':
@@ -62,12 +71,21 @@ export function validMatchInfo(sport: Sport, value: unknown): boolean {
   })
 }
 
+export function validMapUrl(value: unknown): boolean {
+  if (typeof value !== 'string' || value.length > 1000) return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password
+  } catch { return false }
+}
+
 export function validEndAt(start: string, end: unknown) {
   if (end == null || end === '') return true
   return (
     typeof end === 'string' &&
     Number.isFinite(Date.parse(end)) &&
-    Date.parse(end) > Date.parse(start)
+    Date.parse(end) > Date.parse(start) &&
+    Date.parse(end) - Date.parse(start) <= operationPolicy.maxPlayHours * 3600000
   )
 }
 
@@ -133,6 +151,8 @@ export function matchInfoTags(
     if (info.pace) tags.push(info.pace + '/km')
   }
   tags.push((m.operations ? '전체 최대 ' : m.kind === 'friendly' ? '홈팀 ' : '정원 ') + m.capacity + '명')
+  if (m.endAt && Date.parse(m.endAt) - Date.parse(m.start) > operationPolicy.maxPlayHours * 3600000)
+    tags.push('최대 ' + operationPolicy.maxPlayHours + '시간')
   if (m.endAt && validEndAt(m.start, m.endAt)) {
     const minutes = Math.round(
       (Date.parse(m.endAt) - Date.parse(m.start)) / 60000,

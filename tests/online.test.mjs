@@ -167,6 +167,9 @@ test('Worker authentication, D1 permissions, concurrent approvals and participan
       ])
         assert.equal((await req(null, url)).status, 200)
       assert.equal((await req(null, '/api/state')).status, 401)
+      assert.equal((await req(null, '/api/activity')).status, 401)
+      assert.equal((await req(unverified, '/api/activity')).status, 403)
+      assert.equal((await req(null, '/api/match?id=anything')).status, 401)
       assert.equal((await req(unverified, '/api/state')).status, 403)
       assert.equal((await req(outsider, '/api/state')).status, 403)
       if (!actual) {

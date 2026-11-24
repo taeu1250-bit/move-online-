@@ -1,0 +1,15 @@
+.sport-options button { display:flex; align-items:center; justify-content:center; gap:6px; }
+.sport-sheet { color:var(--text, #f5f6fa); background:#1c2232; border:1px solid #394153; border-radius:24px 24px 0 0; padding:0; width:min(100%, 560px); max-width:100%; margin:auto auto 0; box-shadow:0 -12px 48px #0006; }
+.sport-sheet::backdrop { background:#050916b3; }
+.sport-sheet-content { padding:24px 20px max(28px,env(safe-area-inset-bottom)); }
+.sport-sheet .section-head { margin-bottom:20px; }
+.sport-sheet .section-head button { background:transparent; color:inherit; padding:8px; border:0; }
+.sport-sheet .sport-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.venue-option.custom-venue { grid-column:1/-1; }
+.custom-venue-fields { display:grid; gap:16px; margin-top:20px; }
+.venue-detail { margin-top:16px; overflow-wrap:anywhere; }
+.venue-detail p { margin:8px 0; white-space:pre-wrap; }
+.venue-detail a { color:var(--lime, #d9ff63); text-decoration:underline; }
+.activity-more { width:100%; margin:20px 0; min-height:48px; }
+.mode-active { font-size:18px !important; padding:10px 16px !important; }
+.action-pair button { word-break:keep-all; }

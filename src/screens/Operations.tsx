@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { Match } from '../domain/model'
 import {
   operationPolicy as P,
+  automaticEndAt,
   cancelReasons,
   postReasons,
   participantReasons,
@@ -179,6 +180,7 @@ export function OperationPanel({ m }: { m: Match }) {
           최소 {o.min} · 최대 {o.max}
         </span>
       </p>
+      {o.startedAt && <p className="hint">{o.endedAt ? '경기 종료: ' + clock(o.endedAt) : '자동 종료: ' + clock(automaticEndAt(o.startedAt, Date.parse(m.endAt || '')))}</p>}
       <p className="hint">
         {o.count >= o.min ? '경기 진행 가능' : '최소 인원을 모집하고 있어요.'}
         {o.finalFormat
@@ -778,7 +780,7 @@ export function Rules() {
           '최소 충족 시 자동 시작 · 출석 인정 아님',
         ],
         ['최소 미달 직접 시작', '실제 진행 가능 확인 후 시작'],
-        ['예정 종료 시각', '진행 중 경기 자동 종료'],
+        ['예정 종료 시각 또는 실제 시작 후 ' + P.maxPlayHours + '시간', '먼저 도달한 시각에 경기 자동 종료'],
         [`실제 시작 ${P.manualEndMinutes}분 후`, '모집자 직접 종료 가능'],
         [
           `취소 ${P.hideCancelledMinutes}분 후`,

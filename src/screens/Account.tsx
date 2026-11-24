@@ -1,4 +1,4 @@
-import { Manner, ConductActivity } from './Conduct'
+import { Manner } from './Conduct'
 import { TeamMode } from './Teams'
 import { SportLevels } from './SportProfile'
 import { PushSettings } from './PushSettings'
@@ -6,9 +6,9 @@ import { useState } from 'react'
 import { ProfileForm } from './ProfileForm'
 import { Bell, ChevronRight, GraduationCap, Smartphone } from 'lucide-react'
 import type { User } from '../domain/model'
-import { activeEntry, statusLabel } from '../domain/model'
-import { Avatar, BackTitle, Empty, MatchCard } from '../ui/common'
+import { Avatar, BackTitle, Empty } from '../ui/common'
 import { go, useMoov } from '../ui/context'
+import { updateApp } from '../pwa'
 
 function teamRole(user: User) {
   return user.team
@@ -16,97 +16,12 @@ function teamRole(user: User) {
     : '개인 참가자'
 }
 
-export function Activity({ hosted }: { hosted: boolean }) {
-  const { data, user } = useMoov()
-  const [tab, setTab] = useState(hosted ? '내가 모집' : '내가 신청')
-  const [filter, setFilter] = useState('전체')
-  const entries = data.entries.filter((e) => e.userId === user.id)
-  const matches = data.matches
-    .filter((m) =>
-      tab === '내가 모집'
-        ? m.hostId === user.id
-        : m.operations?.joined || entries.some((e) => e.matchId === m.id),
-    )
-    .sort((a, b) => a.start.localeCompare(b.start))
-  const rows = matches
-    .map((m) => ({
-      m,
-      state:
-        activeEntry(data, m, user.id)?.status ||
-        entries.find((e) => e.matchId === m.id)?.status,
-    }))
-    .filter(
-      ({ state }) =>
-        tab === '내가 모집' ||
-        filter === '전체' ||
-        (state && statusLabel[state] === filter),
-    )
-  return (
-    <div className="narrow">
-      <h1>내 활동</h1>
-      <div className="segmented">
-        {['내가 신청', '내가 모집'].map((t) => (
-          <button
-            key={t}
-            className={t === tab ? 'sel' : ''}
-            onClick={() => setTab(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-      {tab === '내가 신청' && (
-        <div className="chips small">
-          {['전체', '승인 대기', '참가 확정'].map((f) => (
-            <button
-              key={f}
-              aria-pressed={f === filter}
-              onClick={() => setFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="card-list">
-        {rows.map(({ m, state }) => (
-          <MatchCard
-            key={m.id}
-            m={m}
-            extra={
-              tab === '내가 모집'
-                ? '내 모집글'
-                : state
-                  ? statusLabel[state]
-                  : undefined
-            }
-          />
-        ))}
-      </div>
-      {!rows.length && (
-        <Empty
-          title={
-            tab === '내가 모집'
-              ? '아직 모집한 경기가 없어요'
-              : '해당하는 신청이 없어요'
-          }
-        >
-          <button
-            className="secondary"
-            onClick={() => go(tab === '내가 모집' ? 'create' : 'home')}
-          >
-            {tab === '내가 모집' ? '경기 모집하기' : '경기 찾기'}
-          </button>
-        </Empty>
-      )}
-      <ConductActivity />
-    </div>
-  )
-}
 export function Profile() {
   const { data, user, services, run, busy } = useMoov()
   const [editing, setEditing] = useState(false)
   const [install, setInstall] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [updateError, setUpdateError] = useState('')
   const joined = data.entries.filter(
     (e) =>
       e.userId === user.id &&
@@ -142,9 +57,9 @@ export function Profile() {
       </section>
       <div className="stats">
         {[
-          ['참여 예정', joined],
-          ['내가 모집', hosted],
-          ['승인 대기', pending],
+          ['참여 예정', data.activityCounts?.joined ?? joined],
+          ['내가 모집', data.activityCounts?.hosted ?? hosted],
+          ['승인 대기', data.activityCounts?.pending ?? pending],
         ].map(([k, v]) => (
           <div key={k}>
             <span>{k}</span>
@@ -157,6 +72,9 @@ export function Profile() {
         <button onClick={() => go('activity')}>
           내 활동
           <ChevronRight />
+        </button>
+        <button onClick={() => go('exercise-history')}>
+          운동한 기록 보기 <ChevronRight />
         </button>
         <button onClick={() => go('notices')}>
           <span>
@@ -214,6 +132,13 @@ export function Profile() {
             <p>
               휴대폰에서는 이 앱을 제공하는 신뢰된 HTTPS 주소로 접속해 주세요.
             </p>
+            <button className="secondary full" disabled={updating} onClick={async () => {
+              setUpdating(true); setUpdateError('')
+              try { await updateApp() }
+              catch (e) { setUpdateError(e instanceof Error ? e.message : '업데이트하지 못했어요. 연결을 확인해 주세요.'); setUpdating(false) }
+            }}>{updating ? '업데이트 확인 중…' : '앱 업데이트'}</button>
+            <p className="hint">최신 화면으로 다시 열어요. 로그인과 운동 기록은 유지돼요.</p>
+            {updateError && <p role="alert">{updateError}</p>}
           </div>
         )}
       </section>
@@ -226,6 +151,9 @@ export function Notices() {
   return (
     <div className="narrow">
       <BackTitle title="내 알림" back="profile" />
+      {!!notes.length && <button className="secondary notice-clear" disabled={busy} onClick={() => {
+        if (window.confirm('내 알림 내역을 모두 삭제할까요? 경기와 운동 기록은 유지돼요.')) void act({ type: 'clearNotices' }, '알림 내역을 모두 삭제했어요.')
+      }}>알림 내역 전체삭제</button>}
       {notes.some((n) => !n.read) && (
         <button
           className="secondary"

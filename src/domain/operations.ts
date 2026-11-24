@@ -4,6 +4,7 @@ export const operationPolicy = {
   autoCancelHours: 1,
   autoStartMinutes: 30,
   manualEndMinutes: 60,
+  maxPlayHours: 3,
   hideCancelledMinutes: 60,
   lateCancelHours: 3,
   lateCancelTenths: -10,
@@ -12,6 +13,12 @@ export const operationPolicy = {
   delegationMinutes: 30,
   inviteHours: 24,
 } as const
+
+// Preserve an earlier planned finish, but never keep a started match open past the cap.
+export function automaticEndAt(startedAt: number, plannedEnd: number) {
+  const limit = startedAt + operationPolicy.maxPlayHours * 3600000
+  return Number.isFinite(plannedEnd) ? Math.max(startedAt, Math.min(limit, plannedEnd)) : limit
+}
 export const cancelReasons = [
   '최소 인원 부족',
   '우천 및 기상악화',

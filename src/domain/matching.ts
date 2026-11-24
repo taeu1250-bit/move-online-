@@ -5,7 +5,7 @@ import {
   isTeamSport,
   matchStatus,
   sports,
-  venues,
+  validVenue,
 } from './model.ts'
 import type { Data, Entry, MatchFields, Match, User } from './model.ts'
 
@@ -58,7 +58,7 @@ function validateMatch(fields: MatchFields, user: User, now: number) {
     '제목은 1~40자로 입력해 주세요.',
   )
   requireRule(
-    venues.some((place) => place === fields.venue),
+    validVenue(fields.venue),
     '운동 장소를 선택해 주세요.',
   )
   requireRule(

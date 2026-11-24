@@ -1,5 +1,6 @@
 import { Rules, MannerHistory, JoinTeam } from './screens/Operations'
 import { Teams } from './screens/Teams'
+import { Chat } from './screens/Chat'
 import { MatchConduct } from './screens/Conduct'
 import { PublicProfile } from './screens/SportProfile'
 import {
@@ -23,9 +24,11 @@ import type { Services } from './data/contracts'
 import { Find } from './screens/Find'
 import { Create } from './screens/Create'
 import { Apply, Detail, Manage } from './screens/Match'
-import { Activity, Notices, Profile } from './screens/Account'
+import { Notices, Profile } from './screens/Account'
+import { Activity } from './screens/Activity'
 import { Context, go } from './ui/context'
 import { Empty, Wordmark } from './ui/common'
+import { useLivePoll } from './ui/useLivePoll'
 const nav = [
   { path: 'home', label: '경기 찾기', Icon: Search },
   { path: 'create', label: '모집하기', Icon: CirclePlus },
@@ -55,6 +58,16 @@ export function App({ services }: { services: Services }) {
   const lock = useRef(false)
   const [, tick] = useState(0)
   const [splash, setSplash] = useState(!snapshot.data?.currentId)
+  const [matchError, setMatchError] = useState('')
+  const [loadingMatch, setLoadingMatch] = useState(false)
+  const reloadMatch = useCallback(async (current: () => boolean) => {
+    if (!id || !['match','apply','manage','edit','conduct'].includes(view) || !services.loadMatch) return
+    try { await services.loadMatch(id); if (current()) setMatchError('') }
+    catch (e) { if (current()) setMatchError(e instanceof Error ? e.message : '연결을 다시 시도하고 있어요.'); throw e }
+    finally { if (current()) setLoadingMatch(false) }
+  }, [id, view, services, snapshot.data?.currentId])
+  useEffect(() => { setMatchError(''); setLoadingMatch(true) }, [id, view])
+  useLivePoll(reloadMatch, 10_000, !!id && ['match','apply','manage','edit','conduct'].includes(view))
   useEffect(() => {
     const timer = window.setTimeout(() => setSplash(false), 600)
     return () => clearTimeout(timer)
@@ -116,13 +129,15 @@ export function App({ services }: { services: Services }) {
   function render() {
     if (detail && !m)
       return (
-        <Empty title="이 경기를 찾을 수 없어요">
+        <Empty title={loadingMatch ? '경기를 불러오고 있어요' : matchError || '이 경기를 찾을 수 없어요'}>
           <a className="secondary" href="#/home">
             경기 찾기
           </a>
         </Empty>
       )
     switch (view) {
+      case 'chat':
+        return <Chat key={user.id + id} matchId={id} />
       case 'join':
         return <JoinTeam token={id} />
       case 'rules':
@@ -143,6 +158,8 @@ export function App({ services }: { services: Services }) {
         return <Create match={m!} />
       case 'activity':
         return <Activity hosted={params.get('tab') === 'hosted'} />
+      case 'exercise-history':
+        return <Activity history hosted={params.get('tab') === 'hosted'} />
       case 'profile':
         return <Profile />
       case 'notices':
@@ -167,7 +184,7 @@ export function App({ services }: { services: Services }) {
     ? view === 'manage'
       ? 'activity'
       : 'home'
-    : view === 'notices'
+    : ['notices','exercise-history'].includes(view)
       ? 'profile'
       : view
   return (
@@ -207,7 +224,7 @@ export function App({ services }: { services: Services }) {
               </div>
             </div>
           </header>
-          <main key={user.id + '-' + path} className="app-main">
+          <main key={user.id + '-' + path} className={'app-main' + (view === 'chat' ? ' app-main-chat' : '')}>
             {render()}
           </main>
           <nav className="bottom-nav" aria-label="주요 메뉴">

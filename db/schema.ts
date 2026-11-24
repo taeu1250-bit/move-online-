@@ -106,6 +106,7 @@ export const notices = sqliteTable(
     text: text().notNull(),
     at: text().notNull(),
     seen: integer().notNull().default(0),
+    dismissedAt: text(),
   },
   (t) => [index('notice_inbox').on(t.recipient, t.at)],
 )

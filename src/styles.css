@@ -497,6 +497,10 @@ button.full {
   margin: auto;
   padding: 22px 16px calc(var(--nav) + env(safe-area-inset-bottom) + 28px);
 }
+.activity-tools{display:flex;align-items:center;gap:12px;margin:10px 0}
+.activity-tools .hint{flex:1;font-size:14px;margin:0;line-height:1.6}
+.activity-tools .icon-btn{flex-shrink:0}
+.notice-clear{margin:0 8px 14px 0}
 .narrow {
   max-width: 640px;
   margin: auto;

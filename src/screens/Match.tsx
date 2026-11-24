@@ -1,4 +1,6 @@
 import { OperationPanel, MatchMore } from './Operations'
+import { ChatLink } from './Chat'
+import { participantPreview } from '../domain/participants'
 import { useState } from 'react'
 import {
   ArrowRight,
@@ -31,6 +33,7 @@ import {
   mannerGuidelines,
   matchInfoTags,
   rosterError,
+  validMapUrl,
 } from '../domain/feedback'
 import { RosterFields, useRoster } from './MatchFields'
 import { Manner } from './Conduct'
@@ -46,6 +49,7 @@ export function Detail({ m, origin }: { m: Match; origin: string | null }) {
   const state = matchStatus(data, m)
   const picked = confirmed(data, m)
   const count = seats(data, m)
+  const preview = participantPreview(data, m)
   const entries = entriesFor(data, m)
   const teammate = m.hostTeamId
     ? data.teamHub?.activeTeamId === m.hostTeamId
@@ -58,7 +62,7 @@ export function Detail({ m, origin }: { m: Match; origin: string | null }) {
   const active = !m.cancelledAt && Date.parse(m.start) > Date.now()
   const latest = entries.find((e) => e.userId === user.id)
   const back =
-    origin === 'hosted'
+    origin?.startsWith('history-') ? 'exercise-history?tab=' + (origin === 'history-hosted' ? 'hosted' : 'joined') : origin === 'hosted'
       ? 'activity?tab=hosted'
       : origin === 'activity'
         ? 'activity'
@@ -74,6 +78,11 @@ export function Detail({ m, origin }: { m: Match; origin: string | null }) {
           <MapPin size={15} />
           {m.venue}
         </span>
+        {(m.info?.venueAddress || m.info?.venueMapUrl || m.info?.venueMeeting) && <div className="venue-detail">
+          {m.info.venueAddress && <p>{m.info.venueAddress}</p>}
+          {m.info.venueMeeting && <p>{m.info.venueMeeting}</p>}
+          {validMapUrl(m.info.venueMapUrl) && <a href={m.info.venueMapUrl} target="_blank" rel="noopener noreferrer">지도에서 위치 보기</a>}
+        </div>}
         <div className="metrics">
           <div>
             <CalendarDays />
@@ -126,19 +135,14 @@ export function Detail({ m, origin }: { m: Match; origin: string | null }) {
           <>
             <progress value={count} max={m.capacity} />
             <div className="member-strip">
-              <span className="member filled">{host.name.slice(-2)}</span>
-              {m.existing > 1 && (
-                <span className="member">+{m.existing - 1}</span>
-              )}
-              {picked.slice(0, 4).map((e) => (
-                <span className="member filled" key={e.id}>
-                  {data.users.find((u) => u.id === e.userId)?.name.slice(-2)}
+              {preview.people.map((person) => (
+                <span className="member filled" key={person.id} title={person.name + (person.id === m.hostId ? ' · 모집자' : '')}>
+                  {person.name.slice(-2)}
                 </span>
               ))}
-              {count < m.capacity && (
-                <span className="member empty-slot">+{m.capacity - count}</span>
-              )}
+              {preview.hidden > 0 && <span className="member" aria-label={'다른 확정 참가자 ' + preview.hidden + '명'}>+{preview.hidden}</span>}
             </div>
+            <p className="hint">확정 {count}명 · 빈자리 {preview.empty}명</p>
           </>
         )}
         <p className="sub-line">
@@ -168,6 +172,7 @@ export function Detail({ m, origin }: { m: Match; origin: string | null }) {
         </p>
       </section>
       <OperationPanel m={m} />
+      <ChatLink m={m} />
       {!m.cancelledAt &&
         m.endAt &&
         Date.parse(m.endAt) <= Date.now() &&
@@ -538,6 +543,7 @@ export function Manage({ m }: { m: Match }) {
       <div className="narrow">
         <BackTitle title="신청자 관리" back={'match/' + m.id} />
         <OperationPanel m={m} />
+        <ChatLink m={m} />
         <div className="panel">이 화면은 경기 모집자만 열 수 있어요.</div>
       </div>
     )
@@ -557,6 +563,7 @@ export function Manage({ m }: { m: Match }) {
   return (
     <div className="narrow">
       <BackTitle title="신청자 관리" back={'match/' + m.id} />
+      <ChatLink m={m} />
       <section className="panel">
         <Tags m={m} />
         <h2 className="large">{m.title}</h2>
