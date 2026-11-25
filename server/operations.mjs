@@ -1,3 +1,4 @@
+import { operationVacancyNotices } from './vacancies.mjs'
 import { requireValue } from './identity.mjs'
 import { getActiveTeam } from './teams.mjs'
 import { restrictionUntilSQL } from './conduct.mjs'
@@ -370,6 +371,12 @@ async function persist(db, row, s, actor, action, at, extra = []) {
       mutation,
     ),
   )
+  const wasFull = previous.closed || count(previous) >= previous.max
+  if (s.kind === 'pickup' && wasFull && count(s) < count(previous) &&
+      ['ops.leave', 'ops.delegate', 'review', 'reviewRoster'].includes(action)) {
+    const departingUser = action === 'ops.delegate' ? previous.hostId : actor
+    batch.push(...operationVacancyNotices(db, s.id, mutation, departingUser))
+  }
   batch.push(...extra.map((fn) => fn(guard, s.id, mutation)))
   const results = await db.batch(batch)
   ok(results[0].meta.changes === 1)

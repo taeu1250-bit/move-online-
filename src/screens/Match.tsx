@@ -208,6 +208,13 @@ export function Detail({ m, origin }: { m: Match; origin: string | null }) {
         </p>
       )}
       <div className="action-bar">
+        {m.vacancyAlert?.subscribed && (
+          <button className="secondary full" disabled={busy} onClick={() =>
+            void act({ type: 'vacancyUnsubscribe', matchId: m.id }, '빈자리 알림을 해제했어요.')
+          }>
+            빈자리 알림 해제
+          </button>
+        )}
         {mine ? (
           <button className="primary full" onClick={() => go('manage/' + m.id)}>
             신청자 관리 <ArrowRight size={18} />
@@ -224,6 +231,12 @@ export function Detail({ m, origin }: { m: Match; origin: string | null }) {
             }
           >
             {statusLabel[entry.status]} · 신청 취소
+          </button>
+        ) : active && m.vacancyAlert?.canSubscribe && !m.vacancyAlert.subscribed ? (
+          <button className="primary full" disabled={busy} onClick={() =>
+            void act({ type: 'vacancySubscribe', matchId: m.id }, '빈자리가 생기면 알려드릴게요.')
+          }>
+            빈자리 알림 받기
           </button>
         ) : (
           <button
