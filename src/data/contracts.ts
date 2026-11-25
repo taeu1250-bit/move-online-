@@ -24,6 +24,7 @@ export function mergeMatchData(base: Data, part: Data): Data {
 }
 export type OnlineCommand =
   | { type: 'clearNotices' }
+  | { type: 'vacancySubscribe' | 'vacancyUnsubscribe'; matchId: string }
   | OperationCommand
   | Command
   | TeamCommand

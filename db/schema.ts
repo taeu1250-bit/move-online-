@@ -150,3 +150,13 @@ export const pushDeliveries = sqliteTable(
   },
   (t) => [index('push_delivery_match').on(t.matchId)],
 )
+
+export const vacancySubscriptions = sqliteTable(
+  'vacancy_subscriptions',
+  {
+    id: text().primaryKey(),
+    matchId: text().notNull().references(() => matches.id, { onDelete: 'cascade' }),
+    userId: text().notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  },
+  (t) => [uniqueIndex('vacancy_match_user').on(t.matchId, t.userId)],
+)

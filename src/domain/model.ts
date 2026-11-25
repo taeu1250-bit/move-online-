@@ -56,6 +56,7 @@ export interface MatchFields {
   description: string
 }
 export interface Match extends MatchFields {
+  vacancyAlert?: { subscribed: boolean; canSubscribe: boolean }
   operations?: OperationView
   hostTeamId?: string | null
   homeMemberIds?: (string | null)[]

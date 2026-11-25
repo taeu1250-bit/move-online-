@@ -31,6 +31,10 @@ import {
   onlyRosterRemovals,
   setLevels,
 } from './match-feedback.mjs'
+import {
+  approvedSeats, availableSeats as available, vacancyFields, vacancyMatchJoin,
+  vacancyCommand, legacyVacancyNotice, consumeLegacyVacancyNotices,
+} from './vacancies.mjs'
 import { pushCommand } from './reminders.mjs'
 import { requireValue } from './identity.mjs'
 import { sports, validVenue, canRepresentSport } from '../src/domain/model.ts'
@@ -39,9 +43,6 @@ const now = () => new Date().toISOString()
 const random = () => crypto.randomUUID()
 const sqlNow = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
 const openMatch = `m.cancelledAt IS NULL AND m.start > ${sqlNow}`
-const approvedSeats =
-  "(SELECT coalesce(sum(json_array_length(a.roster)),0) FROM entries a WHERE a.matchId=m.id AND a.status='approved')"
-const available = `(m.capacity-m.existing-${approvedSeats})`
 const openOpponent =
   "NOT EXISTS(SELECT 1 FROM entries a WHERE a.matchId=m.id AND a.status='approved')"
 const vacanciesFor = (size) =>
@@ -104,8 +105,9 @@ export async function snapshot(db, actor, env, selectedIds = null, lifecycle = t
       CASE WHEN m.hostId=?1 THEN m.homeRoster END AS homeRoster,CASE WHEN m.hostId=?1 THEN m.homeMemberIds END AS homeMemberIds,
       CASE WHEN m.kind='friendly' THEN (SELECT count(*) FROM entries e WHERE e.matchId=m.id AND status='approved') ELSE ${approvedSeats} END AS approvals,
       (SELECT count(*) FROM entries e WHERE e.matchId=m.id AND status='pending') AS pendingCount,
+      ${vacancyFields},
       (SELECT team FROM entries e WHERE e.matchId=m.id AND status='approved' AND team IS NOT NULL LIMIT 1) AS opponent
-      FROM matches m JOIN profiles p ON p.id=m.hostId WHERE m.id IN (SELECT value FROM json_each(?2)) ORDER BY m.start`,
+      FROM matches m JOIN profiles p ON p.id=m.hostId ${vacancyMatchJoin} WHERE m.id IN (SELECT value FROM json_each(?2)) ORDER BY m.start`,
       actor,
       selection,
     ),
@@ -139,7 +141,7 @@ export async function snapshot(db, actor, env, selectedIds = null, lifecycle = t
     users.set(id, person)
   }
   const matches = games.results.map(
-    ({ hostName, hostDept, hostYear, hostLevels, homeMemberIds, ...m }) => {
+    ({ hostName, hostDept, hostYear, hostLevels, homeMemberIds, vacancySubscribed, vacancyCanSubscribe, ...m }) => {
       related(m.hostId, hostName, m.homeTeam)
       Object.assign(users.get(m.hostId), {
         dept: hostDept,
@@ -149,6 +151,7 @@ export async function snapshot(db, actor, env, selectedIds = null, lifecycle = t
       const roster = m.homeRoster ? list(m.homeRoster) : undefined
       return {
         ...m,
+        vacancyAlert: { subscribed: !!vacancySubscribed, canSubscribe: !!vacancyCanSubscribe },
         info: JSON.parse(m.info || '{}'),
         homeRoster: roster,
         homeMemberIds: roster ? companionIds(homeMemberIds, roster) : undefined,
@@ -233,6 +236,8 @@ export async function execute(db, actor, c, env) {
   ).first()
   requireValue(self?.dept, 403, '프로필을 먼저 등록해 주세요.')
   requireValue(typeof c.type === 'string', 400, '요청 종류를 확인해 주세요.')
+  if (c.type === 'vacancySubscribe' || c.type === 'vacancyUnsubscribe')
+    return vacancyCommand(db, actor, c)
   if (await reportCommand(db, actor, c, env)) return
   if (
     [
@@ -626,18 +631,20 @@ export async function execute(db, actor, c, env) {
   )
   const cancel = c.decision === 'cancel',
     approve = c.decision === 'approve'
-  const result = await db.batch([
+  const revision = c.revision ?? null
+  const changes = [
     stmt(
       `UPDATE entries SET status=?,mutation=?,proposedRoster=NULL,proposedNote=NULL,proposedMemberIds=NULL,rosterRevision=rosterRevision+1 WHERE id=? AND status IN ${cancel ? active : "('pending')"}
-      AND EXISTS(SELECT 1 FROM matches m WHERE m.id=entries.matchId AND ${openMatch}
+      AND EXISTS(SELECT 1 FROM matches m WHERE m.id=entries.matchId AND ${cancel ? 'm.cancelledAt IS NULL AND m.start>?' : openMatch}
         AND ${cancel ? 'entries.userId' : 'm.hostId'}=? ${approve ? 'AND ' + vacanciesFor('json_array_length(entries.roster)') + ' AND ' + noOverlap('COALESCE(entries.memberIds,json_array(entries.userId))', 'entries.id') : ''})
         AND (? IS NULL OR rosterRevision=?)`,
       approve ? 'approved' : cancel ? 'cancelled' : 'rejected',
       event,
       c.entryId,
+      ...(cancel ? [at] : []),
       actor,
-      c.revision ?? null,
-      c.revision ?? null,
+      revision,
+      revision,
     ),
     notices(
       approve
@@ -674,6 +681,9 @@ export async function execute(db, actor, c, env) {
           ),
         ]
       : []),
-  ])
-  confirmChange(result[0])
+  ]
+  const result = await db.batch(cancel
+    ? [legacyVacancyNotice(db, c.entryId, actor, revision, at), ...changes, consumeLegacyVacancyNotices(db, c.entryId)]
+    : changes)
+  confirmChange(result[cancel ? 1 : 0])
 }
